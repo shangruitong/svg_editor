@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>SVG editor</title> 
+	<style>
+		#toolbox{
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			left: 0;
+			width: 250px;
+			border-right: 1px solid #ccc;
+		}
+
+		#toolbox h2{
+			margin: 0;
+			padding: 0;
+			background: #eee;
+			font-size: 16px;
+			height: 24px;
+			line-height: 24px;
+			padding: 5px 10px;
+		}
+
+		#toolbox form{
+			padding: 10px;
+		}
+
+		#canvas{
+			position: absolute;
+			left: 260px;
+			top: 10px;
+			bottom: 10px;
+			right: 10px;
+			box-shadow: 2px 2px 10px rgba(0,0,0,.4);
+			border-radius: 5px;
+		}
+
+		label{
+			display: inline-block;
+			width: 80px;
+			text-align: right;
+		}
+
+
+	</style>
+</head>
+<body>
+<div id="toolbox">
+	<h2>创建</h2>
+	<form action="" id="create_shape">
+		<button type="button" create="rect">Rect</button>
+		<button type="button" create="circle">Circle</button>
+		<button type="button" create="ellipse">Ellipse</button>
+		<button type="button" create="line">Line</button>
+	</form>
+	<h2>形状</h2>
+	<form action="" id="shape_attrs">请先创建图形</form>
+	<h2>外观和变换</h2>
+	<form id="look_and_transform" disabled="disabled">
+		<p>
+			<label style="dispaly:inline;">填充</label>
+			<input id="fill" type="color" value="#ffffff">
+		</p>
+		<p>
+			<label style="dispaly:inline;">描边</label>
+			<input id="stroke" type="color" value="#ff0000">
+			<input id="stroke_width" type="range" value="1">
+		</p>
+
+		<p>
+			<label>TranslateX</label>
+			<input id="translate_x" type="range" min="-400" max="400" value="0">
+			<label>TranslateY</label>
+			<input id="translate_y" type="range" min="-400" max="400" value="0">
+			<label>Rotate</label>
+			<input id="rotate" type="range" min="-180" max="180" value="0">
+			<label>Scale</label>
+			<input id="scale" type="range" min="-1" max="2" value="1" step="0.01">
+		</p>
+
+
+
+	</form>
+
+</div>
+
+<div id="canvas"></div>
+
+<script>
+	var SVG_NS="http://www.w3.org/2000/svg";
+
+
+	function createSVG() {
+		var svg=document.createElementNS(SVG_NS,"svg");
+		svg.setAttribute("width","100%");
+		svg.setAttribute("height","100%");
+		canvas.appendChild(svg);
+		
+		return svg;
+	}
+
+	function create(name) {
+		var shape = document.createElementNS(SVG_NS,name);
+		svg.appendChild(shape);
+		select(shape);
+		 
+	}
+
+
+	function select(shape) {
+		var attrs = shapeInfo[shape.tagName].split(",");
+		var attr,name,value;
+
+		attrsForm.innerHTML = "";
+
+		while(attrs.length){
+			console.log(attrs);
+			attr = attrs.shift().split(":");
+			name = attr[0];
+			value = shape.getAttribute(name)||attr[1];
+			createHandle(shape,name,value);//生成控制器
+			shape.setAttribute(name,value);
+		}
+
+		for(name in defaultAttrs){
+			value = shape.getAttribute(name)||defaultAttrs[name];
+			shape.setAttribute(name,value);
+		}
+
+
+		selected = shape;//选中当前形状元素
+
+		updateLookHandle();//更新控制器外观
+	}
+
+
+	function createHandle(shape,name,value) {
+
+		//创建控制条前面的标签
+		var label = document.createElement("label");
+		label.textContent = name ;
+
+		//创建控制条
+		var handle = document.createElement("input");
+		handle.setAttribute("name",name);
+		handle.setAttribute("type","range");
+		handle.setAttribute("value",value);
+		handle.setAttribute("min",0);
+		handle.setAttribute("max",800);
+
+		//将标签和控制条元素添加到属性表单中
+		attrsForm.appendChild(label);
+		attrsForm.appendChild(handle);
+	}
+
+
+	function updateLookHandle() {
+		fill.value = selected.getAttribute("fill");
+		stroke.value = selected.getAttribute("stroke");
+		var t = decodeTransform(selected.getAttribute("transform"));
+
+		translate_x.value = t? t.tx: 0;
+		translate_y.value = t? t.ty: 0;
+		rotate.value = t? t.tx: 0;
+		scale.value = t? t.scale: 1;		
+	}
+
+	function decodeTransform(transString) {
+		var match = /translate\((\d+),(\d+)\)\srotate\((\d+)\)\sscale\((\d+)\)/.exec(transString);
+		return match?{
+			tx:+match[1],
+			ty:+match[2],
+			rotate:+match[3],
+			scale:+match[4]
+		}:null;
+	}
+
+
+
+	function encodeTransform(transObject) {
+		return "translate("+transObject.tx+","+transObject.ty+") rotate("+transObject.rotate+") scale("+transObject.scale+")";
+	}
+
+
+	//图形默认属性
+	var shapeInfo={
+		rect:"x:10,y10,width:200,height:100,rx:0,ry:0",
+		circle:"cx:200,cy:200,r:50",
+		ellipse:"cx:200,cy:200,rx:80,ry:30",
+		line:"x1:10,y1:10,x2:100,y2:100"
+	};
+
+
+	//默认共有的颜色属性
+	var defaultAttrs={
+		fill:"#ffffff",
+		stroke:"#ff0000"
+	};
+
+	var createForm=document.getElementById("create_shape");
+	var attrsForm=document.getElementById("shape_attrs");
+	var lookForm=document.getElementById("look_and_transform");
+
+
+	var svg=createSVG();//创建svg节点元素；
+
+	//绑定点击事件，当点击形状元素是，将当前元素设置为slected对象
+	svg.addEventListener("click",function(e) {
+			if (e.target.tagName.toLowerCase() in shapeInfo) {
+				select(e.target);
+			}
+		});
+
+
+
+	var selected=null;
+
+
+
+
+	createForm.addEventListener("click",function(e) {
+		if(e.target.tagName.toLowerCase()=="button"){
+			create(e.target.getAttribute("create"));
+		}
+	});
+
+	attrsForm.addEventListener("input",function(e) {
+		if(e.target.tagName.toLowerCase()!="input"){ return }
+		var handle=e.target;
+		selected.setAttribute(handle.name,handle.value);
+	});
+
+	lookForm.addEventListener("input",function(e) {
+		if (e.target.tagName.toLowerCase() != "input") { return };
+		if (!selected) {return};
+		selected.setAttribute("fill",fill.value);
+		selected.setAttribute("stroke",stroke.value);
+		selected.setAttribute("stroke-width",stroke_width.value);
+		selected.setAttribute("transform",encodeTransform({
+			tx:translate_x.value,
+			ty:translate_y.value,
+			scale:scale.value,
+			rotate:rotate.value
+		}));
+	})
+
+</script>
+
+	
+</body>
+</html>
